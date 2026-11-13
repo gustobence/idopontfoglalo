@@ -3,28 +3,16 @@
 
 import { useEffect, useState } from "react";
 import { nyitvatartas } from "@/lib/salon";
-
-// A JavaScript getDay() vasárnappal kezd (0), a mi listánk hétfővel.
-// Ez a képlet átváltja: hétfő → 0, ..., vasárnap → 6.
-function maiIndex(datum: Date): number {
-  return (datum.getDay() + 6) % 7;
-}
-
-// Date → "14:05" formátum, hogy össze tudjuk hasonlítani a "09:00"-hoz hasonló szövegekkel
-function oraPerc(datum: Date): string {
-  const ora = String(datum.getHours()).padStart(2, "0");
-  const perc = String(datum.getMinutes()).padStart(2, "0");
-  return `${ora}:${perc}`;
-}
+import { budapestiMost, hetNapIndex, idoPercben } from "@/lib/idopontok";
 
 export default function Nyitvatartas() {
-  // Kezdetben null: a szerveren még nem tudjuk, mennyi az idő a látogatónál.
-  // A pontos időt csak a böngészőben állítjuk be (useEffect), különben eltérés lenne
-  // a szerveren és a böngészőben elkészült oldal között.
-  const [most, setMost] = useState<Date | null>(null);
+  // Kezdetben null: a pontos időt csak a böngészőben állítjuk be (useEffect), különben eltérés
+  // lenne a szerveren és a böngészőben elkészült oldal között.
+  // Budapesti időt használunk, mert a szalon nyitvatartása is budapesti idő szerint értendő.
+  const [most, setMost] = useState<{ datum: string; perc: number } | null>(null);
 
   useEffect(() => {
-    const frissit = () => setMost(new Date());
+    const frissit = () => setMost(budapestiMost());
     const elso = setTimeout(frissit, 0); // azonnal, amint az oldal betöltött
     const idozito = setInterval(frissit, 60_000); // utána percenként
     return () => {
@@ -33,11 +21,11 @@ export default function Nyitvatartas() {
     };
   }, []);
 
-  // Megjegyzés: a látogató gépének óráját használjuk. Magyarországi vendégeknél ez megfelelő.
-  const ma = most ? nyitvatartas[maiIndex(most)] : null;
+  const maiIndex = most ? hetNapIndex(most.datum) : null;
+  const ma = maiIndex !== null ? nyitvatartas[maiIndex] : null;
   const nyitva =
     most && ma?.nyitas && ma.zaras
-      ? oraPerc(most) >= ma.nyitas && oraPerc(most) < ma.zaras
+      ? most.perc >= idoPercben(ma.nyitas) && most.perc < idoPercben(ma.zaras)
       : false;
 
   return (
@@ -61,7 +49,7 @@ export default function Nyitvatartas() {
       </div>
       <ul className="mt-4 divide-y divide-stone-200">
         {nyitvatartas.map((nap, index) => {
-          const maVan = most !== null && index === maiIndex(most);
+          const maVan = index === maiIndex;
           return (
             <li
               key={nap.nap}

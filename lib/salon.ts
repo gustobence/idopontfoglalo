@@ -26,6 +26,12 @@ export const szalon = {
   telefon: "+36 30 000 0000",
 };
 
+// Foglalási szabályok – a böngésző és a szerver is ezeket használja
+export const foglalasiSzabalyok = {
+  foglalhatoNapok: 60, // ennyi napra előre lehet foglalni
+  minElorePerc: 120, // legalább ennyi perccel előre
+};
+
 export const szolgaltatasok: Szolgaltatas[] = [
   {
     id: "manikur",

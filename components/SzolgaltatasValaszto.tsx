@@ -2,6 +2,7 @@
 // Böngészőben futó komponens, mert kattintásra reagál és megjegyzi a kiválasztást.
 
 import { useState } from "react";
+import Link from "next/link";
 import { szolgaltatasok, formazAr, formazIdotartam } from "@/lib/salon";
 
 export default function SzolgaltatasValaszto() {
@@ -74,15 +75,14 @@ export default function SzolgaltatasValaszto() {
               </span>
             </p>
           </div>
-          {/* A tényleges időpontválasztás a következő lépésben készül el */}
-          <button
-            type="button"
-            disabled
-            title="Hamarosan"
-            className="shrink-0 rounded-full bg-rose-600 px-5 py-2.5 text-sm font-medium text-white opacity-60"
+          {/* A választott szolgáltatás azonosítóját a címsorban adjuk át a foglalási oldalnak */}
+          <Link
+            href={kivalasztott ? `/foglalas?szolgaltatas=${kivalasztott.id}` : "/foglalas"}
+            tabIndex={kivalasztott ? 0 : -1}
+            className="shrink-0 rounded-full bg-rose-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-rose-700"
           >
             Időpont választása
-          </button>
+          </Link>
         </div>
       </div>
 

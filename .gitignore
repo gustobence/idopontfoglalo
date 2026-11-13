@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# a mintafájlban nincs titok, ez felkerülhet
+!.env.example
 
 # vercel
 .vercel

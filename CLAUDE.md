@@ -21,7 +21,21 @@ Admin (jelszóval védve): foglalások napi listája, lemondás, időszakok leti
 
 Szándékosan kimarad az első verzióból: online fizetés, vendég általi online lemondás, SMS, több munkatárs.
 
-Jelenleg **tesztadatokkal** dolgozunk (`lib/`), a valódi szalonadatok később kerülnek be.
+A szalon adatai még **tesztadatok** (`lib/salon.ts`), a valódiak később kerülnek be.
+
+## Jelenlegi állapot
+
+- Kész: kezdőoldal, havi naptáras foglalási folyamat, szerveroldali ellenőrzés és mentés (`app/foglalas/actions.ts`).
+- Adatbázis: séma a `db/schema.sql`-ben (átfedés-tiltás `EXCLUDE USING gist`). Kapcsolat: `DATABASE_URL` a `.env.local`-ban.
+  Ha nincs megadva, **tesztüzem**: tesztfoglalások, mentés nélkül.
+- Időzóna: minden "most" budapesti idő szerint (`budapestiMost()`), az adatbázisban `timestamptz`.
+- Hátra van: e-mail-értesítés, adminfelület, adatkezelési tájékoztató, élesítés.
+
+## Parancsok
+
+- `npm run dev` – fejlesztői szerver, `npm test` – automatikus tesztek (`lib/*.test.ts`),
+  `npm run lint`, `npm run build` – ellenőrzések.
+- A PowerShell 5.1 fájlolvasásnál elronthatja az ékezeteket: fájlt ne `Get-Content | Set-Content` párossal módosíts.
 
 ## Technológia
 
