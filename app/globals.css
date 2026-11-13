@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* A menüpontokra kattintva görgessen, ne ugorjon */
+html {
+  scroll-behavior: smooth;
+}
+
+/* A nyitó rész háttérfoltjainak lassú lebegése */
+@keyframes lebeges {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.08);
+  }
+}
+
+.lebego {
+  animation: lebeges 14s ease-in-out infinite;
+}
+
+.lebego-kesve {
+  animation-delay: -7s;
+}
+
+/* Akinek a gépén be van kapcsolva a "kevesebb animáció" beállítás, annak ne mozogjon */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .lebego {
+    animation: none;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #fafaf9;
+  color: #1c1917;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
