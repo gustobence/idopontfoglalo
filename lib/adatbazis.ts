@@ -37,6 +37,89 @@ export async function foglaltIdopontok(napokElore: number): Promise<Foglalas[]> 
   return sorok.map((s) => ({ datum: s.datum, kezdes: s.kezdes, idotartamPerc: s.idotartam_perc }));
 }
 
+// --- Admin: a foglalások teljes adataival (csak bejelentkezett adminnak!) ---
+
+export type AdminFoglalas = {
+  id: number;
+  datum: string; // "2026-11-16"
+  kezdes: string; // "14:00"
+  vege: string; // "14:45"
+  szolgaltatasNev: string;
+  arFt: number;
+  nev: string;
+  telefon: string;
+  email: string;
+  megjegyzes: string;
+  statusz: "aktiv" | "lemondva";
+};
+
+// "kozelgo": a mai naptól előre (legkorábbi elöl)
+// "korabbi": a mai nap előtti 60 nap (legutóbbi elöl)
+export async function adminFoglalasok(nezet: "kozelgo" | "korabbi"): Promise<AdminFoglalas[]> {
+  if (!sql) throw new Error("Nincs adatbázis beállítva");
+
+  // A mai nap kezdete budapesti idő szerint
+  const maKezdete = sql`(date_trunc('day', now() AT TIME ZONE 'Europe/Budapest') AT TIME ZONE 'Europe/Budapest')`;
+  const szures =
+    nezet === "kozelgo"
+      ? sql`lower(idoszak) >= ${maKezdete}`
+      : sql`lower(idoszak) < ${maKezdete} AND lower(idoszak) >= ${maKezdete} - interval '60 days'`;
+  const rendezes = nezet === "kozelgo" ? sql`ORDER BY lower(idoszak) ASC` : sql`ORDER BY lower(idoszak) DESC`;
+
+  const sorok = await sql<
+    {
+      id: string;
+      datum: string;
+      kezdes: string;
+      vege: string;
+      szolgaltatas_nev: string;
+      ar_ft: number;
+      nev: string;
+      telefon: string;
+      email: string;
+      megjegyzes: string;
+      statusz: "aktiv" | "lemondva";
+    }[]
+  >`
+    SELECT id,
+           to_char(lower(idoszak) AT TIME ZONE 'Europe/Budapest', 'YYYY-MM-DD') AS datum,
+           to_char(lower(idoszak) AT TIME ZONE 'Europe/Budapest', 'HH24:MI')    AS kezdes,
+           to_char(upper(idoszak) AT TIME ZONE 'Europe/Budapest', 'HH24:MI')    AS vege,
+           szolgaltatas_nev, ar_ft, nev, telefon, email, megjegyzes, statusz
+    FROM foglalasok
+    WHERE szolgaltatas_id <> 'proba' AND ${szures}
+    ${rendezes}
+    LIMIT 500
+  `;
+
+  return sorok.map((s) => ({
+    id: Number(s.id),
+    datum: s.datum,
+    kezdes: s.kezdes,
+    vege: s.vege,
+    szolgaltatasNev: s.szolgaltatas_nev,
+    arFt: s.ar_ft,
+    nev: s.nev,
+    telefon: s.telefon,
+    email: s.email,
+    megjegyzes: s.megjegyzes,
+    statusz: s.statusz,
+  }));
+}
+
+// Lemondás: nem töröljük a sort, csak "lemondva" állapotba tesszük.
+// Az átfedés-tiltás csak az aktív foglalásokra vonatkozik, így az időpont azonnal újra foglalható.
+// Visszatérési érték: true, ha tényleg lemondtunk egy aktív foglalást.
+export async function foglalasLemondasa(id: number): Promise<boolean> {
+  if (!sql) throw new Error("Nincs adatbázis beállítva");
+  const sorok = await sql`
+    UPDATE foglalasok SET statusz = 'lemondva'
+    WHERE id = ${id} AND statusz = 'aktiv'
+    RETURNING id
+  `;
+  return sorok.length === 1;
+}
+
 export type UjFoglalas = {
   szolgaltatasId: string;
   szolgaltatasNev: string;

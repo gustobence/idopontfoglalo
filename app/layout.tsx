@@ -16,7 +16,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="hu" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="hu"
+      // Jelzi a Next.js-nek, hogy a finom görgetés szándékos (oldalváltáskor kikapcsolja)
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

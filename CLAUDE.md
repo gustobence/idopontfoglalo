@@ -29,12 +29,18 @@ A szalon adatai még **tesztadatok** (`lib/salon.ts`), a valódiak később ker�
 - Adatbázis: séma a `db/schema.sql`-ben (átfedés-tiltás `EXCLUDE USING gist`). Kapcsolat: `DATABASE_URL` a `.env.local`-ban.
   Ha nincs megadva, **tesztüzem**: tesztfoglalások, mentés nélkül.
 - Időzóna: minden "most" budapesti idő szerint (`budapestiMost()`), az adatbázisban `timestamptz`.
-- Hátra van: e-mail-értesítés, adminfelület, adatkezelési tájékoztató, élesítés.
+- Admin: `/admin` (belépés: `/admin/belepes`). Egy közös jelszó; a .env.local-ban csak a lenyomata
+  (`ADMIN_JELSZO_HASH`) és a sütialáíró kulcs (`MUNKAMENET_TITOK`) van – beállítás: `npm run admin:jelszo`.
+  Minden admin Server Action elején újra ellenőrizni kell a bejelentkezést. A sütit mindig elsőként olvasd
+  (különben a build statikusra "süti" az oldalt).
+- Hátra van: időszakok letiltása, e-mail-értesítés, adatkezelési tájékoztató, élesítés.
 
 ## Parancsok
 
 - `npm run dev` – fejlesztői szerver, `npm test` – automatikus tesztek (`lib/*.test.ts`),
   `npm run lint`, `npm run build` – ellenőrzések.
+- `npm run db:setup` (első adatbázis-beállítás), `npm run db:check` (kapcsolat + foglalások),
+  `npm run db:utkozes-proba` (egyidejű dupla foglalás próbája), `npm run admin:jelszo` (admin jelszó).
 - A PowerShell 5.1 fájlolvasásnál elronthatja az ékezeteket: fájlt ne `Get-Content | Set-Content` párossal módosíts.
 
 ## Technológia
