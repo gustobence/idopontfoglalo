@@ -66,7 +66,7 @@ async function AdminTartalom({ searchParams }: Props) {
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
         {!vanAdatbazis && (
-          <p className="mb-6 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <p className="mb-6 rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-800 ring-1 ring-sky-100">
             Nincs adatbázis beállítva (tesztüzem) – itt nem jelennek meg foglalások.
           </p>
         )}

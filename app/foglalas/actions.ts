@@ -5,7 +5,13 @@
 // FONTOS: a böngészőből érkező adatban SEMMIBEN nem bízunk meg – bárki küldhet ide bármit
 // (akár a böngésző megkerülésével is). Ezért itt mindent újra ellenőrzünk.
 
-import { szolgaltatasok, nyitvatartas, foglalasiSzabalyok } from "@/lib/salon";
+import {
+  szolgaltatasok,
+  nyitvatartas,
+  foglalasiSzabalyok,
+  osszesites,
+  formazArSav,
+} from "@/lib/salon";
 import { szabadIdopontok, budapestiMost, napHozzaad } from "@/lib/idopontok";
 import { ellenorizAdatok, type FoglalasiAdatok, type Hibak } from "@/lib/validacio";
 import { aktualisFoglalasok, vanAdatbazis } from "@/lib/foglalasok";
@@ -23,6 +29,7 @@ export async function foglalasLetrehozasa(bemenet: unknown): Promise<FoglalasEre
   const a = (b?.adatok ?? null) as Record<string, unknown> | null;
   if (
     typeof b?.szolgaltatasId !== "string" ||
+    (b.diszitesId !== null && typeof b.diszitesId !== "string") ||
     typeof b.datum !== "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(b.datum) ||
     typeof b.ido !== "string" ||
@@ -49,6 +56,12 @@ export async function foglalasLetrehozasa(bemenet: unknown): Promise<FoglalasEre
   if (!szolgaltatas) {
     return { ok: false, kod: "hiba", uzenet: "Ismeretlen szolgáltatás." };
   }
+  // A díszítéssel együtt: a teljes időtartamot és árat itt, a szerveren számoljuk ki
+  const diszitesId = typeof b.diszitesId === "string" ? b.diszitesId : null;
+  const osszes = osszesites(szolgaltatas, diszitesId);
+  if (!osszes) {
+    return { ok: false, kod: "hiba", uzenet: "Érvénytelen díszítés." };
+  }
 
   // 3. A vendég adatai – ugyanaz a függvény, mint a böngészőben
   const hibak = ellenorizAdatok(adatok);
@@ -64,7 +77,7 @@ export async function foglalasLetrehozasa(bemenet: unknown): Promise<FoglalasEre
     b.datum <= utolsoNap &&
     szabadIdopontok({
       datum: b.datum,
-      idotartamPerc: szolgaltatas.idotartamPerc,
+      idotartamPerc: osszes.idotartamPerc,
       nyitvatartas,
       foglalasok,
       most,
@@ -89,11 +102,16 @@ export async function foglalasLetrehozasa(bemenet: unknown): Promise<FoglalasEre
   try {
     const mentes = await foglalasMentese({
       szolgaltatasId: szolgaltatas.id,
-      szolgaltatasNev: szolgaltatas.nev,
-      arFt: szolgaltatas.arFt,
+      // Ársávnál (komolyabb díszítés) a sávot a névben is rögzítjük, az ar_ft a minimum.
+      // Így az admin pontosan látja: "Épített műköröm – M méret + Komolyabb díszítés (ár: 10 500 – 11 500 Ft)"
+      szolgaltatasNev:
+        osszes.arMin === osszes.arMax
+          ? osszes.nev
+          : `${osszes.nev} (ár: ${formazArSav(osszes.arMin, osszes.arMax)})`,
+      arFt: osszes.arMin,
       datum: b.datum,
       kezdes: b.ido,
-      idotartamPerc: szolgaltatas.idotartamPerc,
+      idotartamPerc: osszes.idotartamPerc,
       nev: adatok.nev.trim(),
       telefon: adatok.telefon.trim(),
       email: adatok.email.trim(),

@@ -1,6 +1,9 @@
 "use client";
-// A foglalás három lépése egy komponensben: 1. időpont → 2. adatok → 3. visszaigazolás.
+// A foglalás három lépése egy komponensben: 1. időpont (díszítés + nap + óra) → 2. adatok → 3. visszaigazolás.
 // Az aktuális lépést és a választásokat állapotként (useState) tartjuk nyilván.
+//
+// Színek: a blokkok a szalon alapszíneinek (rózsaszín, bézs, szürke) halvány árnyalatait kapják,
+// hogy jól elkülönüljenek egymástól, de az oldal letisztult maradjon.
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
@@ -9,7 +12,10 @@ import {
   nyitvatartas,
   foglalasiSzabalyok,
   formazAr,
+  formazArSav,
   formazIdotartam,
+  diszitesek,
+  osszesites,
   type Szolgaltatas,
 } from "@/lib/salon";
 import {
@@ -42,6 +48,7 @@ const uresAdatok: FoglalasiAdatok = {
 export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }: Props) {
   const router = useRouter();
   const [lepes, setLepes] = useState<Lepes>("idopont");
+  const [diszitesId, setDiszitesId] = useState<string | null>(null); // null = nincs díszítés
   const [valasztottNap, setValasztottNap] = useState<string | null>(null);
   const [valasztottIdo, setValasztottIdo] = useState<string | null>(null);
   const [adatok, setAdatok] = useState<FoglalasiAdatok>(uresAdatok);
@@ -66,18 +73,26 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
   const ma = most.datum;
   const utolsoNap = napHozzaad(ma, foglalasiSzabalyok.foglalhatoNapok - 1);
 
-  // Minden foglalható napra kiszámoljuk a szabad időpontokat
+  // A szolgáltatás + díszítés együttes neve, ideje és ára (ugyanaz a függvény, mint a szerveren)
+  const osszes = osszesites(szolgaltatas, diszitesId) ?? osszesites(szolgaltatas, null)!;
+
+  // Egy adott napon mely időpontok férnek bele a megadott időtartamba
+  function szabadAznap(datum: string, idotartamPerc: number): string[] {
+    return szabadIdopontok({
+      datum,
+      idotartamPerc,
+      nyitvatartas,
+      foglalasok,
+      most: most!,
+      minElooPerc: foglalasiSzabalyok.minElorePerc,
+    });
+  }
+
+  // Minden foglalható napra kiszámoljuk a szabad időpontokat – a TELJES időtartammal (díszítéssel együtt)
   const idopontokNaponta: Record<string, string[]> = {};
   for (let i = 0; i < foglalasiSzabalyok.foglalhatoNapok; i++) {
     const datum = napHozzaad(ma, i);
-    idopontokNaponta[datum] = szabadIdopontok({
-      datum,
-      idotartamPerc: szolgaltatas.idotartamPerc,
-      nyitvatartas,
-      foglalasok,
-      most,
-      minElooPerc: foglalasiSzabalyok.minElorePerc,
-    });
+    idopontokNaponta[datum] = szabadAznap(datum, osszes.idotartamPerc);
   }
   const szabadDb = Object.fromEntries(
     Object.entries(idopontokNaponta).map(([datum, lista]) => [datum, lista.length])
@@ -99,6 +114,23 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
       : null;
 
   // --- Eseménykezelők ---
+
+  // Díszítés változásakor: belefér-e még a már kiválasztott időpont?
+  function diszitesValasztas(ujId: string | null) {
+    setDiszitesId(ujId);
+    setUzenet(null);
+    if (aktivNap && valasztottIdo) {
+      const uj = osszesites(szolgaltatas, ujId);
+      if (uj && !szabadAznap(aktivNap, uj.idotartamPerc).includes(valasztottIdo)) {
+        setValasztottIdo(null);
+        setUzenet(
+          `A díszítéssel hosszabb lett az időpont (${formazIdotartam(uj.idotartamPerc)}), ezért a korábban ` +
+            `választott ${valasztottIdo} már nem fér bele. Kérlek, válassz új időpontot.`
+        );
+      }
+    }
+  }
+
   function napValasztas(datum: string) {
     setValasztottNap(datum);
     setValasztottIdo(null); // másik napon a korábban választott óra már nem érvényes
@@ -123,6 +155,7 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
     inditas(async () => {
       const eredmeny = await foglalasLetrehozasa({
         szolgaltatasId: szolgaltatas.id,
+        diszitesId, // csak a választást küldjük – az árat és az időt a szerver számolja
         datum: aktivNap,
         ido: ervenyesIdo,
         adatok,
@@ -148,25 +181,37 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
   return (
     <div>
       {tesztuzem && (
-        <p className="mb-4 rounded-xl bg-amber-50 px-4 py-2 text-sm text-amber-800">
+        <p className="mb-4 rounded-xl bg-sky-50 px-4 py-2 text-sm text-sky-800 ring-1 ring-sky-100">
           Tesztüzem: nincs adatbázis beállítva, a foglalások nem mentődnek el.
         </p>
       )}
 
-      {/* Összegző kártya a választott szolgáltatásról */}
-      <div className="flex items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5">
+      {/* Összegző kártya – rózsaszín–bézs átmenettel, hogy kiemelkedjen */}
+      <div className="flex items-center justify-between gap-4 rounded-3xl bg-gradient-to-r from-rose-100 via-rose-50 to-sky-50 p-5 ring-1 ring-rose-200">
         <div>
-          <p className="text-xs uppercase tracking-wider text-stone-500">Szolgáltatás</p>
-          <p className="text-lg font-medium text-stone-900">{szolgaltatas.nev}</p>
-          <p className="text-sm text-stone-500">
-            {formazIdotartam(szolgaltatas.idotartamPerc)} · {formazAr(szolgaltatas.arFt)}
+          <p className="text-xs font-medium uppercase tracking-wider text-rose-700">A foglalásod</p>
+          <p className="mt-0.5 text-lg font-semibold text-stone-900">{osszes.nev}</p>
+          <p className="text-sm text-stone-600">
+            {formazIdotartam(osszes.idotartamPerc)} · {formazArSav(osszes.arMin, osszes.arMax)}
           </p>
-          {idopontSzoveg && <p className="mt-1 text-sm font-medium text-rose-600">{idopontSzoveg}</p>}
+          {osszes.diszites && (
+            // Részletezés, hogy egyértelmű legyen, miből jön ki a végösszeg
+            <p className="mt-0.5 text-xs text-stone-500">
+              alap: {formazAr(szolgaltatas.arFt)} + {osszes.diszites.nev.toLowerCase()}:{" "}
+              {formazArSav(osszes.diszites.arMin, osszes.diszites.arMax)}
+              {osszes.arMin !== osszes.arMax && " – a végleges ár a minta bonyolultságától függ"}
+            </p>
+          )}
+          {idopontSzoveg && (
+            <p className="mt-2 inline-block rounded-full bg-white/80 px-3 py-1 text-sm font-medium text-rose-700">
+              📅 {idopontSzoveg}
+            </p>
+          )}
         </div>
         {lepes !== "kesz" && (
           <Link
             href="/#szolgaltatasok"
-            className="shrink-0 text-sm text-stone-600 underline-offset-4 hover:underline"
+            className="shrink-0 rounded-full bg-white/70 px-4 py-2 text-sm text-stone-700 ring-1 ring-rose-200 hover:bg-white"
           >
             Módosítás
           </Link>
@@ -183,7 +228,7 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
           <li
             key={l.kulcs}
             className={`flex-1 rounded-full px-3 py-1.5 text-center ${
-              l.kulcs === lepes ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-500"
+              l.kulcs === lepes ? "bg-rose-600 font-medium text-white" : "bg-stone-200/70 text-stone-500"
             }`}
           >
             {l.cim}
@@ -192,17 +237,43 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
       </ol>
 
       {uzenet && (
-        <p role="alert" className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <p role="alert" className="mt-6 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {uzenet}
         </p>
       )}
 
-      {/* ===== 1. LÉPÉS: naptár és időpont ===== */}
+      {/* ===== 1. LÉPÉS: díszítés, nap, időpont ===== */}
       {lepes === "idopont" && (
-        <section className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <h2 className="mb-3 text-lg font-semibold text-stone-900">Válassz napot</h2>
+        <div className="mt-6 space-y-5">
+          {/* Blokk: díszítés – halvány rózsaszín */}
+          <Blokk szin="rozsa" szam={1} cim="Kérsz díszítést?">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <DiszitesOpcio
+                cim="Nem kérek"
+                leiras="Egyszínű, díszítés nélkül."
+                plusz={null}
+                kivalasztva={diszitesId === null}
+                onValaszt={() => diszitesValasztas(null)}
+              />
+              {diszitesek.map((d) => (
+                <DiszitesOpcio
+                  key={d.id}
+                  cim={d.nev}
+                  leiras={d.leiras}
+                  plusz={`+${formazArSav(d.arMin, d.arMax)}`}
+                  kivalasztva={diszitesId === d.id}
+                  onValaszt={() => diszitesValasztas(d.id)}
+                />
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-stone-500">
+              Tipp: a következő lépésben a megjegyzésbe leírhatod, milyen mintát szeretnél.
+            </p>
+          </Blokk>
+
+          {/* Blokk: nap és időpont – halvány bézs */}
+          <Blokk szin="kek" szam={2} cim="Válassz napot és időpontot">
+            <div className="grid gap-6 md:grid-cols-2">
               <Naptar
                 ma={ma}
                 utolsoNap={utolsoNap}
@@ -210,37 +281,37 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
                 kivalasztott={aktivNap}
                 onValaszt={napValasztas}
               />
-            </div>
 
-            <div>
-              <h2 className="mb-3 text-lg font-semibold text-stone-900">
-                {aktivNap
-                  ? formazDatum(aktivNap, { month: "long", day: "numeric", weekday: "long" })
-                  : "Szabad időpontok"}
-              </h2>
-              {aktivNap ? (
-                <div className="space-y-4">
-                  <IdopontCsoport
-                    cim="Délelőtt"
-                    idopontok={delelott}
-                    valasztott={ervenyesIdo}
-                    onValaszt={setValasztottIdo}
-                  />
-                  <IdopontCsoport
-                    cim="Délután"
-                    idopontok={delutan}
-                    valasztott={ervenyesIdo}
-                    onValaszt={setValasztottIdo}
-                  />
-                </div>
-              ) : (
-                <p className="text-stone-600">
-                  A következő {foglalasiSzabalyok.foglalhatoNapok} napban nincs szabad időpont erre a
-                  szolgáltatásra.
-                </p>
-              )}
+              <div className="rounded-2xl bg-white p-4 ring-1 ring-stone-200 sm:p-5">
+                <h3 className="mb-3 font-semibold text-stone-900">
+                  {aktivNap
+                    ? formazDatum(aktivNap, { month: "long", day: "numeric", weekday: "long" })
+                    : "Szabad időpontok"}
+                </h3>
+                {aktivNap ? (
+                  <div className="space-y-4">
+                    <IdopontCsoport
+                      cim="Délelőtt"
+                      idopontok={delelott}
+                      valasztott={ervenyesIdo}
+                      onValaszt={setValasztottIdo}
+                    />
+                    <IdopontCsoport
+                      cim="Délután"
+                      idopontok={delutan}
+                      valasztott={ervenyesIdo}
+                      onValaszt={setValasztottIdo}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-stone-600">
+                    A következő {foglalasiSzabalyok.foglalhatoNapok} napban nincs szabad időpont erre a
+                    szolgáltatásra.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          </Blokk>
 
           <button
             type="button"
@@ -249,88 +320,93 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
               setUzenet(null);
               setLepes("adatok");
             }}
-            className="mt-8 w-full rounded-full bg-rose-600 py-3 font-medium text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400"
+            className="w-full rounded-full bg-rose-600 py-3.5 font-medium text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
           >
             {ervenyesIdo ? `Tovább – ${idopontSzoveg}` : "Válassz időpontot"}
           </button>
-        </section>
+        </div>
       )}
 
       {/* ===== 2. LÉPÉS: adatok ===== */}
       {lepes === "adatok" && (
         // noValidate: a böngésző saját ellenőrzése helyett a miénket használjuk (egységes, magyar üzenetek)
-        <form onSubmit={bekuldes} noValidate className="mt-8 space-y-5">
-          <h2 className="text-xl font-semibold text-stone-900">Add meg az adataidat</h2>
+        <form onSubmit={bekuldes} noValidate className="mt-6 space-y-5">
+          <Blokk szin="szurke" szam={3} cim="Add meg az adataidat">
+            <div className="space-y-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Mezo cimke="Név" hiba={hibak.nev}>
+                  <input
+                    type="text"
+                    autoComplete="name"
+                    value={adatok.nev}
+                    onChange={(e) => mezoValtozas("nev", e.target.value)}
+                    className={mezoStilus(hibak.nev)}
+                  />
+                </Mezo>
 
-          <Mezo cimke="Név" hiba={hibak.nev}>
-            <input
-              type="text"
-              autoComplete="name"
-              value={adatok.nev}
-              onChange={(e) => mezoValtozas("nev", e.target.value)}
-              className={mezoStilus(hibak.nev)}
-            />
-          </Mezo>
+                <Mezo cimke="Telefonszám" hiba={hibak.telefon}>
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="+36 30 123 4567"
+                    value={adatok.telefon}
+                    onChange={(e) => mezoValtozas("telefon", e.target.value)}
+                    className={mezoStilus(hibak.telefon)}
+                  />
+                </Mezo>
+              </div>
 
-          <Mezo cimke="Telefonszám" hiba={hibak.telefon}>
-            <input
-              type="tel"
-              autoComplete="tel"
-              placeholder="+36 30 123 4567"
-              value={adatok.telefon}
-              onChange={(e) => mezoValtozas("telefon", e.target.value)}
-              className={mezoStilus(hibak.telefon)}
-            />
-          </Mezo>
+              <Mezo cimke="E-mail-cím" hiba={hibak.email}>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={adatok.email}
+                  onChange={(e) => mezoValtozas("email", e.target.value)}
+                  className={mezoStilus(hibak.email)}
+                />
+              </Mezo>
 
-          <Mezo cimke="E-mail-cím" hiba={hibak.email}>
-            <input
-              type="email"
-              autoComplete="email"
-              value={adatok.email}
-              onChange={(e) => mezoValtozas("email", e.target.value)}
-              className={mezoStilus(hibak.email)}
-            />
-          </Mezo>
+              <Mezo cimke="Megjegyzés (nem kötelező)" hiba={hibak.megjegyzes}>
+                <textarea
+                  rows={3}
+                  placeholder={osszes.diszites ? "Pl. milyen mintát, színt szeretnél?" : ""}
+                  value={adatok.megjegyzes}
+                  onChange={(e) => mezoValtozas("megjegyzes", e.target.value)}
+                  className={mezoStilus(hibak.megjegyzes)}
+                />
+              </Mezo>
 
-          <Mezo cimke="Megjegyzés (nem kötelező)" hiba={hibak.megjegyzes}>
-            <textarea
-              rows={3}
-              value={adatok.megjegyzes}
-              onChange={(e) => mezoValtozas("megjegyzes", e.target.value)}
-              className={mezoStilus(hibak.megjegyzes)}
-            />
-          </Mezo>
+              <div className="rounded-xl bg-white p-4 ring-1 ring-stone-200">
+                <label className="flex items-start gap-3 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    checked={adatok.hozzajarulas}
+                    onChange={(e) => mezoValtozas("hozzajarulas", e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-rose-600"
+                  />
+                  <span>
+                    Elolvastam és elfogadom az adatkezelési tájékoztatót.{" "}
+                    <span className="text-stone-400">(A tájékoztató élesítés előtt készül el.)</span>
+                  </span>
+                </label>
+                {hibak.hozzajarulas && <p className="mt-1 text-sm text-rose-600">{hibak.hozzajarulas}</p>}
+              </div>
+            </div>
+          </Blokk>
 
-          <div>
-            <label className="flex items-start gap-3 text-sm text-stone-700">
-              <input
-                type="checkbox"
-                checked={adatok.hozzajarulas}
-                onChange={(e) => mezoValtozas("hozzajarulas", e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-rose-600"
-              />
-              <span>
-                Elolvastam és elfogadom az adatkezelési tájékoztatót.{" "}
-                <span className="text-stone-400">(A tájékoztató élesítés előtt készül el.)</span>
-              </span>
-            </label>
-            {hibak.hozzajarulas && <p className="mt-1 text-sm text-rose-600">{hibak.hozzajarulas}</p>}
-          </div>
-
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={() => setLepes("idopont")}
               disabled={kuldesFolyamatban}
-              className="rounded-full border border-stone-300 px-6 py-3 font-medium text-stone-700 hover:border-stone-400 disabled:opacity-50"
+              className="rounded-full bg-white px-6 py-3.5 font-medium text-stone-700 ring-1 ring-stone-300 hover:ring-stone-400 disabled:opacity-50"
             >
               Vissza
             </button>
             <button
               type="submit"
               disabled={kuldesFolyamatban}
-              className="flex-1 rounded-full bg-rose-600 py-3 font-medium text-white transition hover:bg-rose-700 disabled:opacity-60"
+              className="flex-1 rounded-full bg-rose-600 py-3.5 font-medium text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700 disabled:opacity-60"
             >
               {kuldesFolyamatban ? "Küldés…" : "Foglalás elküldése"}
             </button>
@@ -340,20 +416,17 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
 
       {/* ===== 3. LÉPÉS: visszaigazolás ===== */}
       {lepes === "kesz" && (
-        <section className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-2xl text-white">
+        <section className="mt-6 rounded-3xl bg-gradient-to-b from-sky-50 to-white p-8 text-center ring-1 ring-sky-200">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sky-400 text-2xl text-white shadow-lg shadow-sky-200">
             ✓
           </div>
           <h2 className="mt-4 text-xl font-semibold text-stone-900">
             Köszönjük, {adatok.nev.trim()}!
             {mentveTesztben ? " (tesztfoglalás)" : " A foglalásodat rögzítettük."}
           </h2>
-          <p className="mt-2 text-stone-700">
-            {szolgaltatas.nev} · {idopontSzoveg}
-          </p>
-          <p className="mt-1 text-sm text-stone-500">
-            Ha mégsem tudsz jönni, kérlek, jelezd telefonon.
-          </p>
+          <p className="mt-2 text-stone-700">{osszes.nev}</p>
+          <p className="mt-1 font-medium text-rose-700">{idopontSzoveg}</p>
+          <p className="mt-3 text-sm text-stone-500">Ha mégsem tudsz jönni, kérlek, jelezd telefonon.</p>
           {mentveTesztben && (
             <p className="mt-6 rounded-xl bg-white/70 p-3 text-sm text-stone-500">
               Tesztüzem: a foglalás <strong>nem mentődött el</strong>, mert nincs adatbázis beállítva.
@@ -369,6 +442,83 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
 }
 
 // --- Kis segéd-komponensek ---
+
+// Egy számozott blokk a foglalási folyamatban. A háttér fehér (letisztult),
+// a blokkokat a színes sorszám és egy vékony, színes felső csík különbözteti meg.
+const BLOKK_SZINEK = {
+  rozsa: { hatter: "bg-white ring-stone-200 border-t-4 border-t-rose-300", szam: "bg-rose-500" },
+  kek: { hatter: "bg-white ring-stone-200 border-t-4 border-t-sky-300", szam: "bg-sky-400" },
+  szurke: { hatter: "bg-white ring-stone-200 border-t-4 border-t-stone-300", szam: "bg-stone-600" },
+} as const;
+
+function Blokk({
+  szin,
+  szam,
+  cim,
+  children,
+}: {
+  szin: keyof typeof BLOKK_SZINEK;
+  szam: number;
+  cim: string;
+  children: React.ReactNode;
+}) {
+  const s = BLOKK_SZINEK[szin];
+  return (
+    <section className={`rounded-3xl p-4 ring-1 sm:p-6 ${s.hatter}`}>
+      <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold text-stone-900">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${s.szam}`}
+        >
+          {szam}
+        </span>
+        {cim}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+// Egy választható díszítési lehetőség kártyája (rádiógomb-szerű: egyszerre csak egy lehet kiválasztva)
+function DiszitesOpcio({
+  cim,
+  leiras,
+  plusz,
+  kivalasztva,
+  onValaszt,
+}: {
+  cim: string;
+  leiras: string;
+  plusz: string | null;
+  kivalasztva: boolean;
+  onValaszt: () => void;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer flex-col rounded-2xl p-4 transition ${
+        kivalasztva ? "bg-rose-50/60 ring-2 ring-rose-400" : "bg-white ring-1 ring-stone-200 hover:ring-rose-300"
+      }`}
+    >
+      <span className="flex items-start gap-3">
+        <input
+          type="radio"
+          name="diszites"
+          checked={kivalasztva}
+          onChange={onValaszt}
+          className="mt-1 h-4 w-4 accent-rose-600"
+        />
+        <span>
+          <span className="block font-medium text-stone-900">{cim}</span>
+          <span className="mt-0.5 block text-sm text-stone-500">{leiras}</span>
+          <span
+            className={`mt-2 inline-block text-sm font-medium ${plusz ? "text-rose-600" : "text-stone-400"}`}
+          >
+            {plusz ?? "Nincs felár"}
+          </span>
+        </span>
+      </span>
+    </label>
+  );
+}
 
 function IdopontCsoport({
   cim,
@@ -392,10 +542,10 @@ function IdopontCsoport({
             type="button"
             onClick={() => onValaszt(ido)}
             aria-pressed={ido === valasztott}
-            className={`rounded-xl border py-2.5 font-medium transition ${
+            className={`rounded-xl py-2.5 font-medium transition ${
               ido === valasztott
-                ? "border-rose-500 bg-rose-500 text-white"
-                : "border-stone-200 bg-white text-stone-800 hover:border-rose-300"
+                ? "bg-rose-500 text-white shadow-md shadow-rose-200"
+                : "bg-white text-stone-800 ring-1 ring-stone-200 hover:ring-rose-300"
             }`}
           >
             {ido}

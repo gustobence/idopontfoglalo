@@ -7,7 +7,7 @@ import SzolgaltatasValaszto from "@/components/SzolgaltatasValaszto";
 import Nyitvatartas from "@/components/Nyitvatartas";
 
 const menupontok = [
-  { cim: "Szolgáltatások", hivatkozas: "#szolgaltatasok" },
+  { cim: "Árlista", hivatkozas: "#szolgaltatasok" },
   { cim: "Nyitvatartás", hivatkozas: "#nyitvatartas" },
   { cim: "Elérhetőség", hivatkozas: "#elerhetoseg" },
 ];
@@ -44,13 +44,13 @@ export default function Home() {
         <section className="relative isolate overflow-hidden px-4 py-24 text-center sm:py-32">
           <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
             <div className="lebego absolute -left-24 -top-24 h-80 w-80 rounded-full bg-rose-200/60 blur-3xl" />
-            <div className="lebego lebego-kesve absolute -right-20 top-10 h-72 w-72 rounded-full bg-amber-100/80 blur-3xl" />
+            <div className="lebego lebego-kesve absolute -right-20 top-10 h-72 w-72 rounded-full bg-sky-100/80 blur-3xl" />
             <div className="lebego absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-pink-100/70 blur-3xl" />
           </div>
 
           <Megjelenes>
             <p className="text-sm font-medium uppercase tracking-[0.3em] text-rose-600">
-              Körömszalon
+              Körömápolás
             </p>
             <h1 className="mt-4 text-5xl font-semibold tracking-tight text-stone-900 sm:text-7xl">
               {szalon.nev}
@@ -83,18 +83,22 @@ export default function Home() {
           </Megjelenes>
         </section>
 
-        {/* 3. Szolgáltatások – kiválasztható kártyák */}
-        <section id="szolgaltatasok" className="mx-auto max-w-3xl scroll-mt-20 px-4 py-12">
-          <Megjelenes>
-            <h2 className="text-3xl font-semibold tracking-tight text-stone-900">
-              Szolgáltatások
-            </h2>
-            <p className="mt-2 text-stone-600">Válaszd ki, mire szeretnél időpontot.</p>
-          </Megjelenes>
-          {/* Ezt szándékosan NEM tesszük Megjelenes-be: a beúszó animáció "transform"-ja
-              miatt az alsó, képernyőhöz rögzített (fixed) sáv rossz helyre kerülne. */}
-          <SzolgaltatasValaszto />
-        </section>
+        {/* 3. Árlista – kategóriák, kiválasztható változatokkal.
+               Teljes szélességű, halvány rózsaszín–bézs sáv emeli ki az oldalból. */}
+        <div className="bg-gradient-to-b from-rose-50/80 via-sky-50/50 to-transparent">
+          <section id="szolgaltatasok" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-14">
+            <Megjelenes>
+              <p className="text-sm font-medium uppercase tracking-[0.3em] text-rose-600">Szolgáltatások</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-stone-900">Árlista</h2>
+              <p className="mt-2 text-stone-600">
+                Válaszd ki, mire szeretnél időpontot – a díszítést a következő lépésben adhatod hozzá.
+              </p>
+            </Megjelenes>
+            {/* Ezt szándékosan NEM tesszük Megjelenes-be: a beúszó animáció "transform"-ja
+                miatt az alsó, képernyőhöz rögzített (fixed) sáv rossz helyre kerülne. */}
+            <SzolgaltatasValaszto />
+          </section>
+        </div>
 
         {/* 4. Nyitvatartás és elérhetőség */}
         <section className="mx-auto grid max-w-3xl gap-10 px-4 py-12 sm:grid-cols-2">
