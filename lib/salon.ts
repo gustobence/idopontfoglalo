@@ -40,10 +40,15 @@ export type NyitvatartasNap = {
 
 // --- Szalon ---
 
+// A név, a szlogen és a bemutatkozás felülírható a .env.local-ban (NEXT_PUBLIC_SZALON_...).
+// Így a valódi szalon adatai nem kerülnek a Gitbe; ha nincs beállítva, a semleges demószöveg látszik.
+// A "process.env.NEXT_PUBLIC_..." alakot pontosan így kell írni: a Next.js build közben ezt cseréli
+// le a beállított értékre (a böngészőbe kerülő kódban is). Titkot ezért SOHA ne tegyél NEXT_PUBLIC_ változóba.
 export const szalon = {
-  nev: "Demo Nail Studio",
-  szlogen: "Időpontfoglalás pár kattintással.",
+  nev: process.env.NEXT_PUBLIC_SZALON_NEV || "Demo Nail Studio",
+  szlogen: process.env.NEXT_PUBLIC_SZALON_SZLOGEN || "Időpontfoglalás pár kattintással.",
   bemutatkozas:
+    process.env.NEXT_PUBLIC_SZALON_BEMUTATKOZAS ||
     "Szia! Itt a szalon körmöse mutatkozik be. Nálam nincs rohanás, minden vendégre van időm, és mindig a te stílusodhoz igazodom, legyen szó visszafogott, elegáns színekről vagy merészebb díszítésről.",
   cim: "1234 Tesztváros, Minta utca 1.", // TESZT
   telefon: "+36 30 000 0000", // TESZT

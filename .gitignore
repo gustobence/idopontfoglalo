@@ -41,3 +41,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# személyes, helyi Claude-utasítások (nem kerül fel a GitHubra)
+CLAUDE.local.md

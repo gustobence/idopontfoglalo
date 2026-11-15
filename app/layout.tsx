@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import { szalon } from "@/lib/salon";
 
 // "latin-ext" kell a magyar ő és ű betűkhöz
 const geistSans = Geist({
@@ -10,7 +11,7 @@ const geistSans = Geist({
 
 // Ez jelenik meg a böngészőfülön és a Google-találatokban
 export const metadata: Metadata = {
-  title: "Demo Nail Studio – Online időpontfoglalás",
+  title: `${szalon.nev} – Online időpontfoglalás`,
   description: "Foglalj időpontot online manikűrre, gél lakkra, műkörömre.",
 };
 

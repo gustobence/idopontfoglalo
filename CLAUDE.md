@@ -55,3 +55,10 @@ A dupla foglalást az adatbázisnak kell megakadályoznia (átfedő időszakok t
 - Minden beérkező adatot a szerveren validálunk.
 - Az adatbázis-felhasználók csak a szükséges jogosultságot kapják.
 - Élesítés előtt: adatkezelési tájékoztató, tesztelés, és a tárhely feltételeinek ellenőrzése (pl. kereskedelmi használat).
+
+## Nyilvános demó vs. valódi szalon
+
+- A repóban csak semleges demóadat van ("Demo Nail Studio"). A valódi szalon neve, szlogenje és bemutatkozása
+  a `.env.local`-ban van (`NEXT_PUBLIC_SZALON_NEV`, `NEXT_PUBLIC_SZALON_SZLOGEN`, `NEXT_PUBLIC_SZALON_BEMUTATKOZAS`).
+- Személyes munkautasítások: `CLAUDE.local.md` (a `.gitignore` kizárja).
+- Személyes adat (valódi név, a szalon valódi neve, e-mail-cím) soha nem kerülhet a Gitbe.
