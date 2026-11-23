@@ -4,6 +4,7 @@
 // valamint egy véletlen titkos kulcsot a bejelentkezési sütik aláírásához (MUNKAMENET_TITOK).
 // Maga a jelszó sehol nem tárolódik. Újrafuttatva lecseréli a jelszót, és minden korábbi
 // bejelentkezést érvénytelenít (mert új titkos kulcs készül).
+// Vercelhez: npm run admin:jelszo:vercel (csak kiírja az értékeket, fájlt nem módosít).
 
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -29,6 +30,22 @@ if (jelszo !== ujra) {
 if (jelszo.length < MIN_HOSSZ) {
   console.error(`\n❌ A jelszó túl rövid (legalább ${MIN_HOSSZ} karakter kell). Semmit nem módosítottam.\n`);
   process.exit(1);
+}
+
+// Vercelhez (npm run admin:jelszo:vercel): csak kiírja az új értékeket, a .env.local-hoz nem nyúl,
+// így a helyi jelszavad megmarad.
+if (process.argv.includes("--csak-kiir")) {
+  console.log(`
+✅ Ezt a két értéket másold be a Vercelre. A .env.local NEM változott.
+   Ne mentsd el fájlba, és ne küldd el senkinek. Utána töröld a képernyőt: cls
+
+ADMIN_JELSZO_HASH
+${jelszoHash(jelszo)}
+
+MUNKAMENET_TITOK
+${randomBytes(32).toString("hex")}
+`);
+  process.exit(0);
 }
 
 const sorok = existsSync(ENV_FAJL)

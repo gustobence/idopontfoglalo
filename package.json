@@ -12,7 +12,8 @@
     "db:setup": "node scripts/db-setup.ts",
     "db:check": "node scripts/db-check.ts",
     "db:utkozes-proba": "node scripts/db-utkozes-proba.ts",
-    "admin:jelszo": "node scripts/admin-jelszo.ts"
+    "admin:jelszo": "node scripts/admin-jelszo.ts",
+    "admin:jelszo:vercel": "node scripts/admin-jelszo.ts --csak-kiir"
   },
   "dependencies": {
     "next": "16.4.6",
