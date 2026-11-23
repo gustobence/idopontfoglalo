@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { szalon } from "@/lib/salon";
+import DemoSav from "@/components/DemoSav";
 
 // "latin-ext" kell a magyar ő és ű betűkhöz
 const geistSans = Geist({
@@ -23,7 +24,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       data-scroll-behavior="smooth"
       className={`${geistSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <DemoSav />
+        {children}
+      </body>
     </html>
   );
 }

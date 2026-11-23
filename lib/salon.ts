@@ -54,6 +54,9 @@ export const szalon = {
   telefon: "+36 30 000 0000", // TESZT
 };
 
+// Demó = nincs megadva valódi szalonnév. Ilyenkor minden oldal tetején figyelmeztető sáv látszik.
+export const demoUzem = !process.env.NEXT_PUBLIC_SZALON_NEV;
+
 // Foglalási szabályok – a böngésző és a szerver is ezeket használja
 export const foglalasiSzabalyok = {
   foglalhatoNapok: 60, // ennyi napra előre lehet foglalni
