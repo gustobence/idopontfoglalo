@@ -47,7 +47,7 @@ const uresAdatok: FoglalasiAdatok = {
 
 export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }: Props) {
   const router = useRouter();
-  const [lepes, setLepes] = useState<Lepes>("idopont");
+  const [lepesAllapot, setLepes] = useState<Lepes>("idopont");
   const [diszitesId, setDiszitesId] = useState<string | null>(null); // null = nincs díszítés
   const [valasztottNap, setValasztottNap] = useState<string | null>(null);
   const [valasztottIdo, setValasztottIdo] = useState<string | null>(null);
@@ -63,6 +63,18 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
   useEffect(() => {
     const idozito = setTimeout(() => setMost(budapestiMost()), 0);
     return () => clearTimeout(idozito);
+  }, []);
+
+  // A böngésző vissza/előre gombja: az előzményekbe írt lépésre váltunk.
+  // A kész foglalásból nem lehet visszalépni, így nem küldhető el véletlenül újra.
+  useEffect(() => {
+    function elozmenyValtozas(e: PopStateEvent) {
+      const cel: Lepes = e.state?.foglalasLepes === "adatok" ? "adatok" : "idopont";
+      setLepes((jelenlegi) => (jelenlegi === "kesz" ? jelenlegi : cel));
+      setUzenet(null);
+    }
+    window.addEventListener("popstate", elozmenyValtozas);
+    return () => window.removeEventListener("popstate", elozmenyValtozas);
   }, []);
 
   if (!most) {
@@ -105,6 +117,9 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
   // Ha a kiválasztott időpont közben elkelt (pl. frissítés után), ne maradjon kijelölve
   const ervenyesIdo = valasztottIdo && aktivIdopontok.includes(valasztottIdo) ? valasztottIdo : null;
 
+  // Az adatok lépés csak érvényes időponttal jelenhet meg (pl. a böngésző "előre" gombja után is)
+  const lepes: Lepes = lepesAllapot === "adatok" && !ervenyesIdo ? "idopont" : lepesAllapot;
+
   const delelott = aktivIdopontok.filter((ido) => ido < "12:00");
   const delutan = aktivIdopontok.filter((ido) => ido >= "12:00");
 
@@ -135,6 +150,26 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
     setValasztottNap(datum);
     setValasztottIdo(null); // másik napon a korábban választott óra már nem érvényes
     setUzenet(null);
+  }
+
+  // Időpont kijelölése. Ha az "adatok" előzményen állunk, de nincs érvényes időpont (pl. a böngésző
+  // "előre" gombja után), előbb rendbe tesszük a lépést, hogy a kattintás ne ugorjon tovább magától.
+  function idopontValasztas(ido: string) {
+    if (lepesAllapot === "adatok") {
+      window.history.replaceState({ foglalasLepes: "idopont" }, "");
+      setLepes("idopont");
+    }
+    setValasztottIdo(ido);
+  }
+
+  // Vissza az időpontokhoz (Vissza gomb, Módosítás, "1. Időpont" fül). A beírt adatok megmaradnak.
+  function visszaIdoponthoz() {
+    setUzenet(null);
+    if (window.history.state?.foglalasLepes === "adatok") {
+      window.history.back(); // így a böngésző előzményei is rendben maradnak
+    } else {
+      setLepes("idopont");
+    }
   }
 
   function mezoValtozas<K extends keyof FoglalasiAdatok>(mezo: K, ertek: FoglalasiAdatok[K]) {
@@ -169,6 +204,7 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
       } else if (eredmeny.kod === "foglalt") {
         // Az időpont közben elkelt: vissza a naptárhoz, friss adatokkal
         setValasztottIdo(null);
+        window.history.replaceState({ foglalasLepes: "idopont" }, "");
         setLepes("idopont");
         setUzenet(eredmeny.uzenet);
         router.refresh(); // a szerver újra lekéri a foglalásokat
@@ -208,7 +244,18 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
             </p>
           )}
         </div>
-        {lepes !== "kesz" && (
+        {/* Az adatoknál az időpontokhoz visz vissza, az időpontoknál a szolgáltatásokhoz */}
+        {lepes === "adatok" && (
+          <button
+            type="button"
+            onClick={visszaIdoponthoz}
+            disabled={kuldesFolyamatban}
+            className="shrink-0 rounded-full bg-white/70 px-4 py-2 text-sm text-stone-700 ring-1 ring-rose-200 hover:bg-white disabled:opacity-50"
+          >
+            Módosítás
+          </button>
+        )}
+        {lepes === "idopont" && (
           <Link
             href="/#szolgaltatasok"
             className="shrink-0 rounded-full bg-white/70 px-4 py-2 text-sm text-stone-700 ring-1 ring-rose-200 hover:bg-white"
@@ -225,13 +272,26 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
           { kulcs: "adatok", cim: "2. Adatok" },
           { kulcs: "kesz", cim: "3. Kész" },
         ].map((l) => (
-          <li
-            key={l.kulcs}
-            className={`flex-1 rounded-full px-3 py-1.5 text-center ${
-              l.kulcs === lepes ? "bg-rose-600 font-medium text-white" : "bg-stone-200/70 text-stone-500"
-            }`}
-          >
-            {l.cim}
+          <li key={l.kulcs} className="flex-1" aria-current={l.kulcs === lepes ? "step" : undefined}>
+            {l.kulcs === "idopont" && lepes === "adatok" ? (
+              // Az adatok lépésről az "1. Időpont" fülre kattintva vissza lehet menni
+              <button
+                type="button"
+                onClick={visszaIdoponthoz}
+                disabled={kuldesFolyamatban}
+                className="w-full rounded-full bg-rose-100 px-3 py-1.5 text-center font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-50"
+              >
+                {l.cim}
+              </button>
+            ) : (
+              <span
+                className={`block rounded-full px-3 py-1.5 text-center ${
+                  l.kulcs === lepes ? "bg-rose-600 font-medium text-white" : "bg-stone-200/70 text-stone-500"
+                }`}
+              >
+                {l.cim}
+              </span>
+            )}
           </li>
         ))}
       </ol>
@@ -294,13 +354,13 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
                       cim="Délelőtt"
                       idopontok={delelott}
                       valasztott={ervenyesIdo}
-                      onValaszt={setValasztottIdo}
+                      onValaszt={idopontValasztas}
                     />
                     <IdopontCsoport
                       cim="Délután"
                       idopontok={delutan}
                       valasztott={ervenyesIdo}
-                      onValaszt={setValasztottIdo}
+                      onValaszt={idopontValasztas}
                     />
                   </div>
                 ) : (
@@ -318,6 +378,7 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
             disabled={!ervenyesIdo}
             onClick={() => {
               setUzenet(null);
+              window.history.pushState({ foglalasLepes: "adatok" }, ""); // így működik a böngésző vissza gombja
               setLepes("adatok");
             }}
             className="w-full rounded-full bg-rose-600 py-3.5 font-medium text-white shadow-lg shadow-rose-200 transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
@@ -397,7 +458,7 @@ export default function FoglalasFolyamat({ szolgaltatas, foglalasok, tesztuzem }
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setLepes("idopont")}
+              onClick={visszaIdoponthoz}
               disabled={kuldesFolyamatban}
               className="rounded-full bg-white px-6 py-3.5 font-medium text-stone-700 ring-1 ring-stone-300 hover:ring-stone-400 disabled:opacity-50"
             >
