@@ -38,6 +38,21 @@ CREATE INDEX IF NOT EXISTS foglalasok_idoszak_idx ON foglalasok USING gist (idos
 
 
 -- =====================================================================
+-- Rate limiting: az admin belépési próbálkozásai ("közös füzet")
+-- Minden próbálkozás egy sor. Az alkalmazás megszámolja, hány volt egy IP-címről
+-- az elmúlt 15 percben. Az IP-cím személyes adat: 1 nap után az alkalmazás törli.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS belepesi_probak (
+  id      bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  ip      text NOT NULL CHECK (char_length(ip) <= 100),
+  idopont timestamptz NOT NULL DEFAULT now()
+);
+
+-- Gyors számolás: "ez az IP az elmúlt 15 percben"
+CREATE INDEX IF NOT EXISTS belepesi_probak_ip_idopont_idx ON belepesi_probak (ip, idopont);
+
+
+-- =====================================================================
 -- Korlátozott felhasználó az alkalmazásnak (a legkisebb szükséges jogosultság elve)
 -- Az alkalmazás NEM a tulajdonos felhasználóval csatlakozik, hanem ezzel.
 -- A 'IDE_EGY_EROS_JELSZO' helyére írj egy hosszú, véletlenszerű jelszót,
@@ -48,6 +63,8 @@ CREATE INDEX IF NOT EXISTS foglalasok_idoszak_idx ON foglalasok USING gist (idos
 -- GRANT USAGE ON SCHEMA public TO foglalo_app;
 -- GRANT SELECT, INSERT, UPDATE ON foglalasok TO foglalo_app;
 -- (DELETE nincs: lemondáskor a statuszt állítjuk 'lemondva'-ra, a sor megmarad.)
+-- GRANT SELECT, INSERT, DELETE ON belepesi_probak TO foglalo_app;
+-- (Itt van DELETE, mert az 1 napnál régebbi próbálkozásokat az alkalmazás törli; UPDATE nincs.)
 
 
 -- =====================================================================
