@@ -2,9 +2,11 @@
 
 An online appointment booking app for a small nail salon, built with **Next.js (App Router), TypeScript, Tailwind CSS and PostgreSQL (Neon)**.
 
-> **Status: work in progress, not production-ready.** Email notifications, blocking time slots,
-> a privacy notice and deployment are still missing (see [Limitations](#limitations-and-next-steps)).
-> The public repository uses neutral demo data ("Demo Nail Studio"). Real salon data is supplied
+**Live demo:** https://demo-nail-studio-six.vercel.app/ (Vercel + Neon EU database, fictional data only)
+
+> **Status: working portfolio demo, not yet production-ready for a real salon.** Email notifications, blocking
+> time slots and a privacy notice are still missing (see [Limitations](#limitations-and-next-steps)).
+> The public repository and the demo use neutral demo data ("Demo Nail Studio"). Real salon data is supplied
 > through environment variables and is not part of the repository.
 
 The UI and the code identifiers/comments are in Hungarian, because the app is built for a Hungarian salon.
@@ -15,7 +17,9 @@ The UI and the code identifiers/comments are in Hungarian, because the app is bu
 - Price list grouped into categories (gel polish, nail extensions, refills) with S / M / L variants and optional nail art
 - Monthly calendar that marks each day with its number of free slots (full or closed days are disabled), followed by the **actually free start times** for the chosen service
 - Booking form (name, phone, email, note, consent) with instant validation in the browser
+- Going back to the time slots from the details step (Change button, step tab or the browser's Back button)
 - Confirmation screen
+- On the public demo, a banner warns visitors not to enter real personal data
 
 **Admin side** (`/admin`, password protected)
 - Upcoming bookings grouped by day, plus the past 60 days
@@ -54,11 +58,17 @@ Key design decisions:
   browser and the server.
 - **Time zone:** "now" is always Europe/Budapest, regardless of the server or the visitor's time zone;
   the database stores `timestamptz`.
-- **Least privilege:** the app connects with a restricted database role (`SELECT, INSERT, UPDATE`, no `DELETE`);
-  cancelling sets a status instead of deleting the row.
+- **Least privilege:** the app connects with a restricted database role. On bookings it has `SELECT, INSERT, UPDATE`
+  but no `DELETE` – cancelling sets a status instead of deleting the row. On the login-attempt table it has
+  `SELECT, INSERT, DELETE` but no `UPDATE` (old attempts are deleted after one day, because an IP address is personal data).
 - **Admin login:** only a salted **scrypt hash** of the password is stored in an environment variable. A successful
-  login sets an **HMAC-signed, httpOnly, sameSite=lax** cookie that expires after 12 hours. Every admin page and
+  login sets an **HMAC-signed, httpOnly, sameSite=lax** cookie (also `secure` in production) that expires after 12 hours. Every admin page and
   Server Action checks the session again on the server. Comparisons use `timingSafeEqual`.
+- **Login rate limiting:** at most **5 login attempts per IP address in 15 minutes**; from the 6th attempt the password
+  is not even checked. Attempts are stored in the database (`belepesi_probak`), not in memory, because on Vercel the
+  server can run as several instances and restart at any time. Each attempt is **written first and counted after**, so
+  simultaneous requests see each other: in a test, none of 30 concurrent attempts reached the password check. If the
+  counter fails, login is refused (fail closed).
 - **No secrets in the client:** database code is marked `server-only`, so the build fails if a client component
   imports it. Only booked *time ranges* are sent to the browser, never guest details.
 
@@ -75,12 +85,12 @@ Key design decisions:
 | `lib/salon.ts` | Salon data, price list, nail art options (demo values) |
 | `lib/adatbazis.ts` | PostgreSQL queries (server only) |
 | `lib/auth.ts`, `lib/jelszo.ts` | Password hashing, signed session cookie |
-| `db/schema.sql` | Table, overlap constraint, restricted role |
+| `db/schema.sql` | Bookings and login-attempt tables, overlap constraint, restricted role |
 | `scripts/` | DB setup, connection check, concurrency test, admin password setup |
 
 ## Running locally
 
-Requirements: Node.js (developed with Node 26; the scripts run `.ts` files directly with Node), npm.
+Requirements: Node.js 24 (the scripts run `.ts` files directly with Node), npm.
 
 ```bash
 npm install
@@ -122,10 +132,12 @@ constraint has its own manual check script (`npm run db:utkozes-proba`), which n
 - No email notifications yet (salon + guest confirmation)
 - Admin cannot block time ranges or edit opening hours / services from the UI yet
 - Privacy notice is not written yet (required before going live)
-- Login brute-force protection is only a 1-second delay per wrong attempt – no real rate limiting
+- Login rate limiting counts per IP address: an attacker with many IP addresses can get around it, and people sharing
+  one IP (office, mobile network) share the limit. A long password and the salted hash remain the main protection.
+- Booking submissions are not rate limited yet
 - Single shared admin password, single staff member
 - Durations in the price list are estimates; address and phone number are placeholders
-- Not deployed
+- The demo runs on Vercel's Hobby plan (non-commercial use); a real salon would need a paid plan
 
 ## Built with AI assistance
 
@@ -140,8 +152,11 @@ Online időpontfoglaló egy kis körmösszalonnak (Next.js, TypeScript, Tailwind
 A vendég kiválasztja a szolgáltatást, a naptárban a napot, majd csak a ténylegesen szabad időpontok közül választhat,
 és megadja az adatait. A szerver minden adatot újra ellenőriz, az árat és az időtartamot maga számolja,
 a dupla foglalást pedig az adatbázis akadályozza meg (átfedő időszakok tiltása, `EXCLUDE USING gist`), egyszerre
-érkező foglalásoknál is. Jelszóval védett adminfelület: foglalások listája és lemondás.
+érkező foglalásoknál is. Jelszóval védett adminfelület: foglalások listája és lemondás; a belépést adatbázis-alapú
+korlát védi (IP-címenként 15 percen belül legfeljebb 5 próbálkozás).
 
-**Állapot: fejlesztés alatt, nem élesítésre kész.** Hiányzik még az e-mail-értesítés, az időszakok letiltása,
-az adatkezelési tájékoztató és az élesítés. A nyilvános repóban semleges demóadatok vannak; a valódi szalon adatai
-környezeti változókból érkeznek, és nem részei a repónak.
+**Élő demó:** https://demo-nail-studio-six.vercel.app/ (kitalált adatokkal)
+
+**Állapot: működő portfóliódemó, valódi szalonhoz még nem élesítésre kész.** Hiányzik még az e-mail-értesítés,
+az időszakok letiltása és az adatkezelési tájékoztató. A nyilvános repóban és a demóban semleges demóadatok vannak;
+a valódi szalon adatai környezeti változókból érkeznek, és nem részei a repónak.
