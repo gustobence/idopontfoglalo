@@ -107,6 +107,29 @@ export async function adminFoglalasok(nezet: "kozelgo" | "korabbi"): Promise<Adm
   }));
 }
 
+// --- Rate limiting: a belépési próbálkozások "közös füzete" ---
+// Vercelen a szerver több példányban fut, és bármikor újraindulhat, ezért a próbálkozásokat
+// nem a memóriában, hanem az adatbázisban számoljuk – ezt minden példány látja.
+// Visszatérési érték: ennyi próbálkozás volt erről az IP-címről az elmúlt `percenBelul` percben
+// (a mostanit is beleszámolva).
+export async function belepesiProbaRogzitese(ip: string, percenBelul: number): Promise<number> {
+  if (!sql) throw new Error("Nincs adatbázis beállítva");
+
+  // Az IP-cím személyes adat: csak addig tartjuk meg, amíg kell (1 nap), utána töröljük.
+  await sql`DELETE FROM belepesi_probak WHERE idopont < now() - interval '1 day'`;
+
+  // SORREND: előbb BEÍRJUK, csak utána SZÁMOLUNK. Ha fordítva lenne, az egyszerre érkező
+  // kérések mind "0 próbálkozást" látnának, és mind átjutnának (versenyhelyzet).
+  await sql`INSERT INTO belepesi_probak (ip) VALUES (${ip})`;
+
+  const [{ darab }] = await sql<{ darab: number }[]>`
+    SELECT count(*)::int AS darab
+    FROM belepesi_probak
+    WHERE ip = ${ip} AND idopont > now() - make_interval(mins => ${percenBelul}::int)
+  `;
+  return darab;
+}
+
 // Lemondás: nem töröljük a sort, csak "lemondva" állapotba tesszük.
 // Az átfedés-tiltás csak az aktív foglalásokra vonatkozik, így az időpont azonnal újra foglalható.
 // Visszatérési érték: true, ha tényleg lemondtunk egy aktív foglalást.

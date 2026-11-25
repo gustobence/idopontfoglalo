@@ -89,6 +89,8 @@ try {
     GRANT USAGE ON SCHEMA public TO ${APP_FELHASZNALO};
     GRANT SELECT, INSERT, UPDATE ON foglalasok TO ${APP_FELHASZNALO};
     REVOKE DELETE, TRUNCATE ON foglalasok FROM ${APP_FELHASZNALO};
+    GRANT SELECT, INSERT, DELETE ON belepesi_probak TO ${APP_FELHASZNALO};
+    REVOKE UPDATE, TRUNCATE ON belepesi_probak FROM ${APP_FELHASZNALO};
   `);
 
   // --- 3. Jogosultságok ellenőrzése ---

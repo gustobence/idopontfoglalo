@@ -5,6 +5,7 @@
 
 import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
+import { headers } from "next/headers";
 import {
   adminBeallitva,
   jelszoHelyes,
@@ -12,9 +13,20 @@ import {
   munkamenetZar,
   bejelentkezve,
 } from "@/lib/auth";
-import { foglalasLemondasa } from "@/lib/adatbazis";
+import { foglalasLemondasa, belepesiProbaRogzitese, vanAdatbazis } from "@/lib/adatbazis";
 
 export type BelepesAllapot = { hiba: string | null };
+
+// Rate limiting: egy IP-címről legfeljebb ennyi belépési próbálkozás ennyi percen belül
+const MAX_PROBA = 5;
+const IDOABLAK_PERC = 15;
+
+// A látogató IP-címe. A Vercel ezt az x-forwarded-for fejléc ELSŐ elemébe írja.
+// A saját gépen (npm run dev) ez általában "::1"; ha a fejléc hiányzik, "helyi".
+async function latogatoIp(): Promise<string> {
+  const fejlecek = await headers();
+  return fejlecek.get("x-forwarded-for")?.split(",")[0].trim() || "helyi";
+}
 
 export async function belepes(_elozo: BelepesAllapot, urlap: FormData): Promise<BelepesAllapot> {
   if (!adminBeallitva()) {
@@ -22,6 +34,23 @@ export async function belepes(_elozo: BelepesAllapot, urlap: FormData): Promise<
       hiba: "Az admin még nincs beállítva. A projekt mappájában futtasd: npm run admin:jelszo, majd indítsd újra a szervert.",
     };
   }
+
+  // Rate limiting – MÉG a jelszó ellenőrzése ELŐTT. (Adatbázis nélkül, tesztüzemben nincs közös
+  // füzet, ezért ott kimarad; élesben mindig van adatbázis.)
+  if (vanAdatbazis) {
+    let probak: number;
+    try {
+      probak = await belepesiProbaRogzitese(await latogatoIp(), IDOABLAK_PERC);
+    } catch (hiba) {
+      // Ha a számlálás nem sikerül, inkább NEM engedünk be (biztonságos irányba hibázunk).
+      console.error("A belépési próbálkozás rögzítése sikertelen:", hiba);
+      return { hiba: "Most nem lehet belépni. Próbáld újra néhány perc múlva." };
+    }
+    if (probak > MAX_PROBA) {
+      return { hiba: `Túl sok próbálkozás. Próbáld újra ${IDOABLAK_PERC} perc múlva.` };
+    }
+  }
+
   const jelszo = urlap.get("jelszo");
   if (typeof jelszo !== "string" || !jelszoHelyes(jelszo)) {
     // Szándékos várakozás: lassítja a jelszó-találgatást
